@@ -1,0 +1,124 @@
+<html>
+<head>
+  <script src="../dist/incremental-dom.js"></script>
+  <style>
+    #container {
+      margin-top: 20px;
+    }
+
+    x-item {
+      display: block;
+    }
+
+    x-item[data-selected="true"] {
+      color: white;
+      background-color: blue;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <p>
+    The text of the zero-th item is updated and the highlighted item changes.
+    A small wrapper, using native webcomponents, is used to create a React-like
+    lifecycle is used to only diff an item that might have changes.
+  </p>
+
+  <script type="module">
+    import {BaseComponent} from './base_component.js';
+    import {before} from './demo_utils.js';
+
+    const {
+      patch,
+      elementOpen,
+      elementVoid,
+      elementClose,
+      text,
+    } = IncrementalDOM;
+
+
+    /**
+     * This demo uses a bit of logic in base_component.js to use React-like
+     * props, shouldComponentUpdate and render functions. This is not part of
+     * the library itself, but something that can be built without too much
+     * trouble.
+     *
+     * An element that only diffs children if text or selected changed. The
+     * constructor isn't used directly, only to keep track of the number of
+     * times render is called.
+     *
+     * If needed, the component can be manually created using
+     * document.createElement, appended to the body and the 'props' property
+     * updated as necessary, which might be useful for tests.
+     */
+    class Item extends BaseComponent {
+      /*
+       * Before calling render for this component, the component logic calls
+       * shouldComponentUpdate to see if the contents need to be updated at
+       * all.
+       */
+      shouldComponentUpdate(newProps, oldProps) {
+        return newProps.text !== oldProps.text;
+      }
+
+      /**
+       * This render function renders into a shadowRoot of the custom
+       * element.
+       */
+      render() {
+        text(this.props.text);
+      }
+    }
+    customElements.define('x-item', Item);
+
+    const container = document.getElementById('container');
+
+    function update(data) {
+      patch(container, function() {
+        data.items.forEach(function(item, index) {
+          // You can also pass `Item` here instead of `'x-item'`.
+          elementOpen('x-item', index, null,
+              'data-selected', index === data.selectedIndex,
+              'props', {
+                text: item
+              });
+          elementClose('x-item');
+        });
+
+        elementOpen('div', null, null,
+                'style', 'position: absolute; top: 0; right: 0;');
+          text('calls to x-item\'s render: ' + data.itemRenderCount);
+        elementClose('div');
+      });
+    }
+
+    // Updates the selected index, the text of the zero-th item and rerenders
+    // every second
+    const items = ['update #0', 'first', 'second', 'third', 'fourth'];
+    let updateCount = 0;
+    let itemRenderCount = 0;
+
+    before(Item.prototype, 'render', function() {
+      itemRenderCount += 1;
+    });
+
+    setInterval(function() {
+      updateCount += 1;
+      const selectedIndex = (updateCount + 1) % items.length;
+      items[0] = 'update #' + updateCount;
+
+      update({
+        items,
+        selectedIndex,
+        itemRenderCount,
+      });
+    }, 1000);
+
+    update({
+      items: items,
+      selectedIndex: 1
+    });
+  </script>
+</body>
+</html>
